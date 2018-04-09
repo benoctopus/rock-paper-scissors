@@ -1,10 +1,12 @@
 //TODO: make non-spaghetti codes
 
 $(document).ready(() => {
+  //geterdone
+
   firebaseInit();
   setCommon();
   checkInitialState();
-  dbListen()
+  dbListen();
 });
 
 function firebaseInit() {
@@ -23,24 +25,35 @@ function firebaseInit() {
 }
 
 function setCommon() {
+  //Database references
 
   window.dbRef = {
+    spectators: db.ref("/spectators"),
     state: db.ref("/state"),
-    players: db.ref("/players"),
-    spectators: db.ref("/spectators")
-  };
 
-  window.gameState = {};
-  window.players = {};
-  window.spectators = {};
-  window.clientType = undefined;
-  window.username = undefined;
+    players: {
+      one: db.ref("/players/one"),
+      two: db.ref("/players/two"),
+    },
+  };
+  //local copies
+
+  window.local = {
+    spectators: {},
+    state: {},
+
+    players: {
+      one: {},
+      two: {},
+    }
+  };
 }
 
 function checkInitialState() {
+  //ensure gameState exists
 
   dbRef.state.once("value").then(snap => {
-    if (!(snap.exists())) {
+    if (!snap.exists()) {
       window.gameState = {
         running: false,
         playerCount: 0,
@@ -48,17 +61,37 @@ function checkInitialState() {
       };
       dbRef.state.set(gameState);
     }
-    else {
-      window.gameState = snap.val()
-    }
-  }, (err) => {console.log(err)});
+  }, err => {
+    console.log(err)
+  })
 }
 
 function dbListen() {
+  //set firebase listeners for realtime sync
 
   dbRef.state.on("value", snap => {
-    window.gameState = snap.val()
-  })
+    window.local.state = snap.val();
+  }, err => {
+    console.log(err)
+  });
+
+  dbRef.players.one.on("value", snap => {
+    window.local.players.one = snap.val();
+  }, err => {
+    console.log(err)
+  });
+
+  dbRef.players.two.on("value", snap => {
+    window.local.players.two = snap.val();
+  }, err => {
+    console.log(err)
+  });
+
+  dbRef.spectators.on("child_added", snap => {
+    window.local.spectators = snap.val()
+  }, err => {
+    console.log(err)
+  });
 }
 
 
