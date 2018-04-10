@@ -3,11 +3,12 @@
 $(document).ready(() => {
   //geterdone
 
-  checkLocal()
   firebaseInit();
   setCommon();
   checkInitialState();
   dbListen();
+  checkLocal();
+  displaySwitch();
 });
 
 //firebase Functions
@@ -31,8 +32,8 @@ function setCommon() {
   //Database references
 
   window.dbRef = {
-    spectators: db.ref("/spectators"),
     state: db.ref("/state"),
+    users: db.ref("/users"),
 
     players: {
       one: db.ref("/players/one"),
@@ -49,8 +50,18 @@ function setCommon() {
       one: {},
       two: {},
       spectators: {}
-    }
+    },
+
+    username: undefined,
+    role: undefined
   };
+  //section tag references
+
+  window.displayRef = {};
+
+  $("section").each(function() {
+    window.displayRef[$(this).attr("id").split("-")[0]] = ref;
+  })
 }
 
 function checkInitialState() {
@@ -104,7 +115,7 @@ function dbListen() {
 
   //spectators
   dbRef.players.spectators.on("value", snap => {
-    window.local.players.spectators = snap.val()
+    window.local.players.spectators = snap.val();
   }, err => {
     console.log(err)
   });
@@ -137,15 +148,108 @@ function setupPage() {
   })
 }
 
+function waitingAnimation(jClass) {
+  //takes jquery references and changed their display settings in sequence
+  // . .. ...  . .. ... <= like that
+
+  function clearAll(elements) {
+    //set all displays to none
+
+    elements.forEach(ref => {
+      ref.css("display", "none");
+    });
+  }
+
+  function seperate(jClass) {
+    //make array of .waiting ref
+
+    let elements = [];
+    jClass.each(function() {
+      elements.push($(this));
+    });
+    return elements
+  }
+
+  this.elements = seperate(jClass);
+  clearAll(this.elements);
+  this.i = 0;
+
+  window.waitingInterval = setInterval(() => {
+    if (this.i > 2) {
+      clearAll(this.elements);
+      i = 0;
+    }
+    else {
+      this.elements[i].css("display", "block");
+      this.i++
+    }
+  }, 1000);
+}
+
 function displaySwitch() {
+ //master display dispatcher
+ //window construction relative to local.role and local.state.running
 
-
+  $("section").fadeOut(500, () => {
+    if (typeof window.local.role === "undefined") {
+      window.displayRef.setup.fadeIn(500)
+    }
+    else{
+      if (!window.local.state.running) {
+        window.displayRef.waiting.fadeIn(500);
+        waitingAnimation($(".waiting"));
+      }
+      else {
+        window.displayRef.game.fadeIn(500)
+      }
+    }
+  })
 }
 
 //misc
 
 function checkLocal() {
-  if (typeof localStorage.username !== "undefined") {
-    local.username = localStorage.username;
+  //check local storage for saved data
+
+  function loadData() {
+    //check saved username
+
+    window.local.username = localStorage.username;
   }
+
+  function referenceDb()  {
+    //check for database storage of name
+
+    [dbRef.players.one, dbRef.players.two].forEach(ref => {
+      ref.once("value").then(snap => {
+        if (snap.val().name === window.local.username) {
+          window.local.role = "player";
+        }
+      });
+    });
+
+    if (window.local.role !== undefined) {
+      return
+    }
+
+    dbRef.players.spectators.once("value").then(snap => {
+      if (Object.values(snap.val()).indexOf(window.local.username) >= -1) {
+        window.local.role = "spectator";
+      }
+    });
+
+    if (window.local.role !== undefined) {
+      return;
+    }
+
+    //if not in db reset localStorage
+    localStorage.username = undefined;
+    window.local.username = undefined;
+  }
+
+  if (typeof localStorage.username !== "undefined") {
+    loadData();
+    referenceDb(window.local.username)
+  }
+
 }

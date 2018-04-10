@@ -20,7 +20,7 @@
 </header>
 
 <!--initial user prompt-->
-<section class="container mt-3 mt-md-5 p-2 " id="setup-window" style="">
+<section class="container mt-3 mt-md-5 p-2 " id="setup-window" style="display: none">
   <div class="row justify-content-center">
     <div class="card col-11 col-lg-10 mb-2">
 
@@ -77,6 +77,35 @@
           </div>
 
         </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!--Standby Screen-->
+<section class="container" id="waiting-window" style="display: none">
+  <div class="row justify-content-center mt-5 ">
+    <div class="col-auto card border-0">
+      <div class="row justify-content-center">
+        <div class="card-header h2 text-center p-3">
+          <p>Waiting for other Players</p>
+        </div>
+      </div>
+      <div class="row justify-content-center">
+        <div class="col-auto">
+        <div class="row justify-content-center p-3">
+            <div class="col-auto">
+              <img src="assets/images/icons8-select-50.png" class="p-4 img-fluid waiting" id="waiting1"/>
+            </div>
+            <div class="col-auto">
+              <img src="assets/images/icons8-select-50.png" class="p-4 img-fluid waiting" id="waiting2"/>
+            </div>
+            <div class="col-auto">
+              <img src="assets/images/icons8-select-50.png" class="p-4 img-fluid waiting"  id="waiting3"/>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -146,7 +175,7 @@
                  src="assets/images/if_check-box-outline-blank_326558.svg">
           </div>
           <div class="col-4">
-          <img class="img-fluid p-1 strike" id="player2-strike-3"
+            <img class="img-fluid p-1 strike" id="player2-strike-3"
                  src="assets/images/if_check-box-outline-blank_326558.svg">
           </div>
         </div>
@@ -169,7 +198,6 @@
   src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
   integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
   crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ocanvas/2.9.1/ocanvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.0/moment.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/4.12.1/firebase.js"></script>
 <script src="assets/javascript/game.js"></script>
