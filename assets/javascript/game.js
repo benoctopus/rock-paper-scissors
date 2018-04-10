@@ -3,11 +3,14 @@
 $(document).ready(() => {
   //geterdone
 
+  checkLocal()
   firebaseInit();
   setCommon();
   checkInitialState();
   dbListen();
 });
+
+//firebase Functions
 
 function firebaseInit() {
   //firebase initialized, database shortcut = db
@@ -34,17 +37,18 @@ function setCommon() {
     players: {
       one: db.ref("/players/one"),
       two: db.ref("/players/two"),
+      spectators: db.ref("/players/spectators")
     },
   };
   //local copies
 
   window.local = {
-    spectators: {},
     state: {},
 
     players: {
       one: {},
       two: {},
+      spectators: {}
     }
   };
 }
@@ -69,30 +73,79 @@ function checkInitialState() {
 function dbListen() {
   //set firebase listeners for realtime sync
 
+  //gameState
   dbRef.state.on("value", snap => {
-    window.local.state = snap.val();
+    if (snap.exists()) {
+      window.local.state = snap.val();
+    }
   }, err => {
     console.log(err)
   });
 
+  //player 1
   dbRef.players.one.on("value", snap => {
-    window.local.players.one = snap.val();
+    if (snap.exists()) {
+      window.local.players.one = snap.val();
+      $(".p1-username").text(snap.val().name)
+    }
   }, err => {
     console.log(err)
   });
 
+  //player 2
   dbRef.players.two.on("value", snap => {
-    window.local.players.two = snap.val();
+    if (snap.exists()) {
+      window.local.players.two = snap.val();
+      $(".p2-username").text(snap.val().name)
+    }
   }, err => {
     console.log(err)
   });
 
-  dbRef.spectators.on("child_added", snap => {
-    window.local.spectators = snap.val()
+  //spectators
+  dbRef.players.spectators.on("value", snap => {
+    window.local.players.spectators = snap.val()
   }, err => {
     console.log(err)
   });
 }
 
+//Jquery logic
+
+function setupPage() {
+  //listener  & for Setup Form
+
+  let form = $("form");
+  form.submit(event => {
+    event.preventDefault();
+    console.log("here");
+    let user = $("#username").val();
+    if (user.length > 0) {
+
+      if (($("#spectate").is(":checked"))
+        && Object.keys(local.players.spectators).indexOf(user) > -1) {
+        localStorage.username = user;
+        local.role = "spectator";
+        let tmp = {user};
+        dbRef.spectators.push(tmp);
+        alert(`you are ${local.username}`)
+      }
+    }
+
+    localStorage.username = user;
+    local.username = user;
+  })
+}
+
+function displaySwitch() {
 
 
+}
+
+//misc
+
+function checkLocal() {
+  if (typeof localStorage.username !== "undefined") {
+    local.username = localStorage.username;
+  }
+}
