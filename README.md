@@ -9,6 +9,8 @@ Game is playable by two players over the internet. both players must choose a us
 
 Ingame players must choose a symbol by clicking on it's icon (rock, paper, scissors) and then wait for the opposing player to choose. once both players have chosen, their choices will be evaluated and a winner will be chosen. this cycle repeats until one player has accrued three wins. After completion, the winner will be displayed and the app will reset after three seconds.
 
+note: this app uses local storage to keep track of local players. if you wish to test the multiplayer functionality by yourself on one machine you may need to use two seperate web browsers.
+
 ##Dependencies
 This project uses extensively:
 
