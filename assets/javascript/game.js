@@ -8,7 +8,6 @@ $(document).ready(() => {
   checkInitialState();
   dbListen();
   checkLocal();
-  displaySwitch();
 });
 
 //firebase Functions
@@ -107,6 +106,10 @@ function dbListen() {
   dbRef.state.on("value", snap => {
     if (snap.exists()) {
       window.local.state = snap.val();
+      if (window.local.state.playerCount >= 2
+        && window.local.state.running === false) {
+        checkReady();
+      }
     }
   }, err => {
     console.log(err)
@@ -116,7 +119,7 @@ function dbListen() {
   dbRef.players.one.on("value", snap => {
     if (snap.exists()) {
       window.local.players.one = snap.val();
-      $(".p1-username").text(snap.val().name)
+      $(".p1-username").text(snap.val().name);
     }
   }, err => {
     console.log(err)
@@ -126,11 +129,12 @@ function dbListen() {
   dbRef.players.two.on("value", snap => {
     if (snap.exists()) {
       window.local.players.two = snap.val();
-      $(".p2-username").text(snap.val().name)
+      $(".p2-username").text(snap.val().name);
     }
   }, err => {
     console.log(err)
   });
+
 
   //spectators
   dbRef.players.spectators.on("value", snap => {
@@ -140,15 +144,23 @@ function dbListen() {
   });
 }
 
+function checkReady() {
+  console.log("start it");
+  dbRef.state.update({running: true});
+  if (window.currentDisplay !== "game") {
+    displaySwitch();
+  }
+  console.log("there")
+}
+
 //Jquery logic
 
 function formListener() {
   //listener  & for Setup Form
 
-  let form = $("form");
+  window.form = $("form");
   form.submit(event => {
     event.preventDefault();
-    console.log("here");
     let user = $("#username").val();
     let spectate = $("#spectate");
     if (user.length > 0) {
@@ -167,41 +179,101 @@ function formListener() {
       else if (!(spectate.is(":checked"))) {
         if ((typeof local.players.one.name === "undefined"
             || typeof local.players.two.name === "undefined")
-          && local.players.one.name !== user
-          && local.players.two.name !== user
+          && window.local.role !== "player1"
+          && window.local.role !== "player2"
         ) {
           localStorage.username = user;
           local.username = user;
 
-          //player1
-          if (typeof local.players.one.name === "undefined") {
-            window.local.role = "player1";
-            dbRef.players.one.set({
-              name: local.username,
-              sign: null,
-              points: 0
-            })
-          }
+          if (window.local.state.playerCount < 2) {
+            //player1
+            if (typeof local.players.one.name === "undefined") {
+              window.local.role = "player1";
+              dbRef.players.one.set({
+                name: local.username,
+                sign: null,
+                points: 0
+              }).then(() => {
+                window.local.state.playerCount++;
+                dbRef.state.update({playerCount: local.state.playerCount})
+              });
+            }
 
-          //player 2
-          else {
-            window.local.role = "player2";
-            dbRef.players.two.set({
-              name: local.username,
-              sign: null,
-              points: 0
-            })
+            //player 2
+            else if (typeof local.players.two.name === "undefined") {
+              window.local.role = "player2";
+              dbRef.players.two.set({
+                name: local.username,
+                sign: null,
+                points: 0
+              }).then(() => {
+                window.local.state.playerCount++;
+                dbRef.state.update({playerCount: local.state.playerCount})
+              });
+            }
           }
           alert(`you are ${local.username}: ${local.role}`);
-          displaySwitch()
+          displaySwitch();
+        }
+        else if (local.role === "player1" || local.role === "player2") {
+          return
+        }
+        else {
+          alert("both player spots are filled")
         }
       }
-
       //you did it wrong case
       else {
         alert("invalid input")
       }
     }
+  })
+}
+
+function signListener() {
+  //listener for ingame buttons
+
+  function resetSigns() {
+    Object.values(dbRef.players).forEach((value) => {
+      value.update({sign: null}).then(() => {
+      sign.each(function() {
+        let tmpSign = $(this);
+        if (tmpSign.css("display") === "none") {
+          tmpSign.fadeIn(500)
+        }
+      })
+    })
+    })
+  }
+
+  function hideSigns(id) {
+    sign.each(function () {
+      if ($(this).attr("id") !== id) {
+        $(this).fadeOut(250);
+      }
+    })
+  }
+
+  resetSigns();
+  let sign = $(".sign");
+  sign.on("click", function (event) {
+    let clicked = $(this);
+    if (window.local.role === "player1") {
+      dbRef.players.one.update(
+        {sign: clicked.attr("id")}
+      ).then(() => {
+        window.checkSigns()
+      });
+    }
+    else if (window.local.role === "player2") {
+      dbRef.players.two.update(
+        {sign: clicked.attr("id")}
+      ).then(() => {
+        window.checkSigns()
+      });
+    }
+    hideSigns(clicked.attr("id"));
+    sign.off("click")
   })
 }
 
@@ -251,21 +323,81 @@ function displaySwitch() {
 
   $("section").fadeOut(500, () => {
     if (typeof window.local.role === "undefined") {
-      window.displayRef.setup.fadeIn(500, formListener)
+      window.displayRef.setup.fadeIn(500, formListener);
+      window.currentDisplay = "setup"
     }
     else {
       if (!window.local.state.running) {
         window.displayRef.waiting.fadeIn(500);
-        waitingAnimation($(".waiting"));
+        window.currentDisplay = "waiting"
+        // waitingAnimation($(".waiting"));
       }
       else {
-        window.displayRef.game.fadeIn(500)
+        window.displayRef.game.fadeIn(500);
+        window.currentDisplay = "game";
+        window.signListener();
       }
     }
   })
 }
 
 //misc
+
+function checkSigns() {
+  //check if both players have chosen and evaluate
+
+  function evaluate(one, two) {
+    //evaluate player picks
+
+    function nestEvaluate(sign, win, loose, eval) {
+      switch(eval) {
+        case win:
+          return "win";
+        case loose:
+          return "loose";
+        case sign:
+          return "tie"
+      }
+    }
+
+    switch(one) {
+      case "rock":
+        return nestEvaluate("rock", "paper", "scissors", two);
+      case "paper":
+        return nestEvaluate("paper", "rock", "scissors", two);
+      case "scissors":
+        return nestEvaluate("scissors", "paper", "rock", two);
+    }
+  }
+
+  function determineWinner(results) {
+    //act appropriately
+
+    function writeResult(local, ref) {
+      ref.update({
+        points: (local.points + 1)
+      }).then(() => {
+        signListener()
+      })
+    }
+
+    switch(results) {
+      case "win":
+
+
+    }
+
+  }
+
+
+  if (typeof local.players.one.sign !== "undefined"
+    && typeof local.players.one.sign !== "undefined") {
+    console.log("message")
+    let results = evaluate(local.players.one.sign, local.players.two.sign);
+    determineWinner(results)
+
+  }
+}
 
 function checkLocal() {
   //check local storage for saved data
@@ -280,41 +412,49 @@ function checkLocal() {
     //check for database storage of name
 
     //check players
-    [dbRef.players.one, dbRef.players.two].forEach(ref => {
+    [dbRef.players.one, dbRef.players.two].forEach((ref, index) => {
       ref.once("value").then(snap => {
         if (snap.val() !== null) {
           if (snap.val().name === window.local.username) {
-            window.local.role = "player";
+            window.local.role = `player${index + 1}`;
+            displaySwitch();
           }
         }
       });
     });
 
-    if (window.local.role !== undefined) {
-      return
-    }
-
     //check spectators
     dbRef.players.spectators.once("value").then(snap => {
-      if(snap.val() !== null){
+      if (snap.val() !== null) {
         if (Object.values(snap.val()).indexOf(window.local.username) >= -1) {
           window.local.role = "spectator";
+          displaySwitch();
         }
       }
     });
 
-    if (window.local.role !== undefined) {
-      return;
-    }
 
     //if not in db reset localStorage
-    localStorage.username = undefined;
-    window.local.username = undefined;
+    // localStorage.username = undefined;
+    // window.local.username = undefined;
   }
 
   //run loads if local storage value exists
   if (typeof localStorage.username !== "undefined") {
     loadData();
-    referenceDb(window.local.username)
+    referenceDb()
   }
+  else {
+    displaySwitch()
+  }
+}
+
+//dev cheatcodes
+
+function hardReset() {
+  // reset database, local, and force page reset
+
+  db.ref().set({});
+  localStorage.clear();
+  location.reload()
 }
