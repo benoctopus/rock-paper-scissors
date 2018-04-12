@@ -41,7 +41,8 @@ function setCommon() {
     },
 
     flags: {
-      round: db.ref("/round")
+      round: db.ref("/round"),
+      reset: db.ref("/reset")
     }
   };
   //local copies
@@ -66,6 +67,8 @@ function setCommon() {
     let ref = $(this);
     window.displayRef[ref.attr("id").split("-")[0]] = ref;
   });
+
+  window.instructions = $("#instruction")
 }
 
 function checkInitialState() {
@@ -154,7 +157,7 @@ function dbListen() {
   //round complete
 
   dbRef.flags.round.on("value", snap => {
-    if(snap.exists()) {
+    if (snap.exists()) {
       if (snap.val().complete === true) {
         console.log("the point");
         if (local.role === "player1") {
@@ -173,7 +176,21 @@ function dbListen() {
         }
         dbRef.flags.round.update({
           complete: false
-        }).then(() => {updatePoints()})
+        }).then(() => {
+          updatePoints()
+        })
+      }
+    }
+  });
+
+  //dev cheatcode listener
+
+  dbRef.flags.reset.on("value", snap => {
+    if (snap.exists()) {
+      if (snap.val().reset === true) {
+        localStorage.clear();
+        db.ref().set({});
+        location.reload()
       }
     }
   })
@@ -285,6 +302,7 @@ function signListener() {
 
   let sign = $(".sign");
   resetSigns();
+  instructions.text("Pick your move!");
   console.log("sign listener");
   sign.off("click");
   sign.on("click", function (event) {
@@ -366,7 +384,9 @@ function displaySwitch() {
       else {
         window.displayRef.game.fadeIn(500);
         window.currentDisplay = "game";
-        window.signListener();
+        $(".strike").attr("src", "assets/images/if_check-box-outline-blank_326558.svg");
+        updatePoints();
+        signListener();
       }
     }
   })
@@ -376,9 +396,11 @@ function updatePoints() {
 
   [local.players.one, local.players.two].forEach((obj, index) => {
     for (let i = 1; i <= obj.points; i++) {
-      $(`#player${index + 1}-strike-${i}`).attr("src", "assets/images/if_check-box-outline_326561.svg")
+      $(`#player${index + 1}-strike-${i}`).attr(
+        "src", "assets/images/if_check-box-outline_326561.svg"
+      )
     }
-  })
+  });
 }
 
 //misc
@@ -504,7 +526,5 @@ function checkLocal() {
 function hardReset() {
   // reset database, local, and force page reset
 
-  db.ref().set({});
-  localStorage.clear();
-  location.reload()
+  dbRef.flags.reset.update({reset: true})
 }
