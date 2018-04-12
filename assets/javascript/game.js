@@ -43,7 +43,9 @@ function setCommon() {
     flags: {
       round: db.ref("/round"),
       reset: db.ref("/reset")
-    }
+    },
+
+    chat: db.ref("/chat")
   };
   //local copies
 
@@ -57,7 +59,8 @@ function setCommon() {
     },
 
     username: undefined,
-    role: undefined
+    role: undefined,
+    chat: []
   };
   //section tag references
 
@@ -68,7 +71,8 @@ function setCommon() {
     window.displayRef[ref.attr("id").split("-")[0]] = ref;
   });
 
-  window.instructions = $("#instruction")
+  window.instructions = $("#instruction");
+  window.chat = $("#text-here")
 }
 
 function checkInitialState() {
@@ -125,8 +129,10 @@ function dbListen() {
   //player 1
   dbRef.players.one.on("value", snap => {
     if (snap.exists()) {
-      if (local.players.one.points !== snap.val().points) {
-        // signListener()
+      if (local.players.one.points < snap.val().points) {
+        instructions.text(
+          `${snap.val().name}: +1`
+        )
       }
       window.local.players.one = snap.val();
       $(".p1-username").text(snap.val().name);
@@ -138,7 +144,10 @@ function dbListen() {
   //player 2
   dbRef.players.two.on("value", snap => {
     if (snap.exists()) {
-      if (local.players.two.points !== snap.val().points) {
+      if (local.players.two.points < snap.val().points) {
+        instructions.text(
+          `${snap.val().name}: +1`
+        );
       }
       window.local.players.two = snap.val();
       $(".p2-username").text(snap.val().name);
@@ -154,32 +163,78 @@ function dbListen() {
     console.log(err)
   });
 
+  db.ref("/complete").on("value", snap => {
+    if (snap.exists()) {
+      if (snap.val().end === true) {
+        console.log("win!");
+        instructions.text(`${snap.val().player}: wins. Restarting...`);
+        setTimeout(hardReset, 3000)
+      }
+    }
+  });
+
   //round complete
 
   dbRef.flags.round.on("value", snap => {
-    if (snap.exists()) {
-      if (snap.val().complete === true) {
-        console.log("the point");
-        if (local.role === "player1") {
-          dbRef.players.one.update({
-            sign: null
+      if (snap.exists()) {
+        if (snap.val().complete === true) {
+          console.log("the point");
+          if (local.players.one.points > 2
+            || local.players.two.points > 2) {
+            console.log("win?");
+            if (local.players.one.points > 2) {
+              db.ref("/complete").set({
+                end: true,
+                player: local.players.one.name
+              })
+            }
+            else if (local.players.two.points > 2) {
+              db.ref("/complete").set({
+                end: true,
+                player: local.players.two.name
+              })
+
+            }
+          }
+          else if (local.role === "player1") {
+            dbRef.players.one.update({
+              sign: null
+            }).then(() => {
+              signListener()
+            });
+          }
+          else if (local.role === "player2") {
+            dbRef.players.two.update({
+              sign: null
+            }).then(() => {
+              signListener()
+            })
+          }
+          dbRef.flags.round.update({
+            complete: false
           }).then(() => {
-            signListener()
-          });
-        }
-        else if (local.role === "player2") {
-          dbRef.players.two.update({
-            sign: null
-          }).then(() => {
-            signListener()
+            updatePoints()
           })
         }
-        dbRef.flags.round.update({
-          complete: false
-        }).then(() => {
-          updatePoints()
-        })
       }
+    }
+  );
+
+  //chat
+
+  dbRef.chat.on("value", snap => {
+    if (snap.exists()) {
+      console.log(JSON.parse(snap.val().messages));
+      local.chat = JSON.parse(snap.val().messages);
+      chat.empty();
+      local.chat.forEach(message => {
+        let elem = $(
+          `<div class='row justify-content-center' style="width: 90%"><div class="col-12"><p>`
+          + `${message}`
+          + `</p></div></div>`
+        );
+        chat.prepend(elem);
+      })
     }
   });
 
@@ -287,9 +342,10 @@ function signListener() {
 
   function resetSigns() {
     console.log("reset");
-    setTimeout(function() {
+    setTimeout(function () {
       sign.css("display", "block")
-    }, 1000)
+      instructions.text("Pick your move!");
+    }, 1500)
   }
 
   function hideSigns(id) {
@@ -302,7 +358,6 @@ function signListener() {
 
   let sign = $(".sign");
   resetSigns();
-  instructions.text("Pick your move!");
   console.log("sign listener");
   sign.off("click");
   sign.on("click", function (event) {
@@ -321,6 +376,7 @@ function signListener() {
         window.checkSigns()
       });
     }
+    instructions.text("Waiting...");
     hideSigns(clicked.attr("id"));
     // sign.off("click")
   })
@@ -386,6 +442,7 @@ function displaySwitch() {
         window.currentDisplay = "game";
         $(".strike").attr("src", "assets/images/if_check-box-outline-blank_326558.svg");
         updatePoints();
+        chatListener();
         signListener();
       }
     }
@@ -401,6 +458,23 @@ function updatePoints() {
       )
     }
   });
+}
+
+function chatListener() {
+  let ct = $("#chat-entry");
+  let inp = $("#chat-text");
+  ct.off("submit");
+  ct.on("submit", (event) => {
+      event.preventDefault();
+      let blurb = inp.val().trim();
+      let message = `${local.username}: `
+        + `${blurb}`;
+      local.chat.push(message);
+      dbRef.chat.update({
+        messages: JSON.stringify(local.chat)
+      });
+    }
+  );
 }
 
 //misc
@@ -462,13 +536,12 @@ function checkSigns() {
   }
 
   if (typeof local.players.one.sign !== "undefined"
-  && typeof local.players.one.sign !== "undefined") {
-  console.log("message");
-  let results = evaluate(local.players.one.sign, local.players.two.sign);
-  console.log(results);
-  determineWinner(results)
-
-}
+    && typeof local.players.one.sign !== "undefined") {
+    console.log("message");
+    let results = evaluate(local.players.one.sign, local.players.two.sign);
+    console.log(results);
+    determineWinner(results);
+  }
 }
 
 function checkLocal() {
@@ -488,7 +561,9 @@ function checkLocal() {
       ref.once("value").then(snap => {
         if (snap.val() !== null) {
           if (snap.val().name === window.local.username) {
-            window.local.role = `player${index + 1}`;
+            window.local.role =
+              `player${index + 1}`
+            ;
             displaySwitch();
           }
         }
