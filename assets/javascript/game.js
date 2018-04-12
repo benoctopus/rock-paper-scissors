@@ -157,11 +157,14 @@ function dbListen() {
   });
 
   //spectators
+
   dbRef.players.spectators.on("value", snap => {
     window.local.players.spectators = snap.val();
   }, err => {
     console.log(err)
   });
+
+  //game complete
 
   db.ref("/complete").on("value", snap => {
     if (snap.exists()) {
@@ -252,6 +255,8 @@ function dbListen() {
 }
 
 function checkReady() {
+  //check if both players ready
+
   console.log("start it");
   dbRef.state.update({running: true});
   if (window.currentDisplay !== "game") {
@@ -341,14 +346,18 @@ function signListener() {
   //listener for ingame buttons
 
   function resetSigns() {
+    //reset sign display
+
     console.log("reset");
     setTimeout(function () {
-      sign.css("display", "block")
+      sign.css("display", "block");
       instructions.text("Pick your move!");
     }, 1500)
   }
 
   function hideSigns(id) {
+    //hide non-chosen signs
+
     sign.each(function () {
       if ($(this).attr("id") !== id) {
         $(this).fadeOut(250);
@@ -450,6 +459,7 @@ function displaySwitch() {
 }
 
 function updatePoints() {
+  //update scoreboard
 
   [local.players.one, local.players.two].forEach((obj, index) => {
     for (let i = 1; i <= obj.points; i++) {
@@ -461,6 +471,8 @@ function updatePoints() {
 }
 
 function chatListener() {
+  //listen for chat input on enter key
+
   let ct = $("#chat-entry");
   let inp = $("#chat-text");
   ct.off("submit");
