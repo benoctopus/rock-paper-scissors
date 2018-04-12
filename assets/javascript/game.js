@@ -136,7 +136,6 @@ function dbListen() {
   dbRef.players.two.on("value", snap => {
     if (snap.exists()) {
       if (local.players.two.points !== snap.val().points) {
-        // signListener()
       }
       window.local.players.two = snap.val();
       $(".p2-username").text(snap.val().name);
@@ -163,7 +162,7 @@ function dbListen() {
             sign: null
           }).then(() => {
             signListener()
-          })
+          });
         }
         else if (local.role === "player2") {
           dbRef.players.two.update({
@@ -172,7 +171,9 @@ function dbListen() {
             signListener()
           })
         }
-        $(".sign").css("display", "true")
+        dbRef.flags.round.update({
+          complete: false
+        }).then(() => {updatePoints()})
       }
     }
   })
@@ -269,7 +270,9 @@ function signListener() {
 
   function resetSigns() {
     console.log("reset");
-   sign.css("display", "block")
+    setTimeout(function() {
+      sign.css("display", "block")
+    }, 1000)
   }
 
   function hideSigns(id) {
@@ -369,6 +372,15 @@ function displaySwitch() {
   })
 }
 
+function updatePoints() {
+
+  [local.players.one, local.players.two].forEach((obj, index) => {
+    for (let i = 1; i <= obj.points; i++) {
+      $(`#player${index + 1}-strike-${i}`).attr("src", "assets/images/if_check-box-outline_326561.svg")
+    }
+  })
+}
+
 //misc
 
 function checkSigns() {
@@ -390,7 +402,7 @@ function checkSigns() {
 
     switch (one) {
       case "rock":
-        return nestEvaluate("rock", "paper", "scissors", two);
+        return nestEvaluate("rock", "scissors", "paper", two);
       case "paper":
         return nestEvaluate("paper", "rock", "scissors", two);
       case "scissors":
@@ -420,7 +432,9 @@ function checkSigns() {
         writeResult(local.players.two, dbRef.players.two);
         break;
       case "tie":
-        signListener();
+        dbRef.flags.round.update({
+          complete: true
+        });
         break;
     }
   }
