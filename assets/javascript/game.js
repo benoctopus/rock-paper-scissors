@@ -39,6 +39,10 @@ function setCommon() {
       two: db.ref("/players/two"),
       spectators: db.ref("/players/spectators")
     },
+
+    flags: {
+      round: db.ref("/round")
+    }
   };
   //local copies
 
@@ -118,6 +122,9 @@ function dbListen() {
   //player 1
   dbRef.players.one.on("value", snap => {
     if (snap.exists()) {
+      if (local.players.one.points !== snap.val().points) {
+        // signListener()
+      }
       window.local.players.one = snap.val();
       $(".p1-username").text(snap.val().name);
     }
@@ -128,6 +135,9 @@ function dbListen() {
   //player 2
   dbRef.players.two.on("value", snap => {
     if (snap.exists()) {
+      if (local.players.two.points !== snap.val().points) {
+        // signListener()
+      }
       window.local.players.two = snap.val();
       $(".p2-username").text(snap.val().name);
     }
@@ -135,13 +145,37 @@ function dbListen() {
     console.log(err)
   });
 
-
   //spectators
   dbRef.players.spectators.on("value", snap => {
     window.local.players.spectators = snap.val();
   }, err => {
     console.log(err)
   });
+
+  //round complete
+
+  dbRef.flags.round.on("value", snap => {
+    if(snap.exists()) {
+      if (snap.val().complete === true) {
+        console.log("the point");
+        if (local.role === "player1") {
+          dbRef.players.one.update({
+            sign: null
+          }).then(() => {
+            signListener()
+          })
+        }
+        else if (local.role === "player2") {
+          dbRef.players.two.update({
+            sign: null
+          }).then(() => {
+            signListener()
+          })
+        }
+        $(".sign").css("display", "true")
+      }
+    }
+  })
 }
 
 function checkReady() {
@@ -159,7 +193,8 @@ function formListener() {
   //listener  & for Setup Form
 
   window.form = $("form");
-  form.submit(event => {
+  form.off("submit");
+  form.on("submit", event => {
     event.preventDefault();
     let user = $("#username").val();
     let spectate = $("#spectate");
@@ -212,11 +247,10 @@ function formListener() {
               });
             }
           }
-          alert(`you are ${local.username}: ${local.role}`);
           displaySwitch();
         }
         else if (local.role === "player1" || local.role === "player2") {
-          return
+          return;
         }
         else {
           alert("both player spots are filled")
@@ -234,16 +268,8 @@ function signListener() {
   //listener for ingame buttons
 
   function resetSigns() {
-    Object.values(dbRef.players).forEach((value) => {
-      value.update({sign: null}).then(() => {
-      sign.each(function() {
-        let tmpSign = $(this);
-        if (tmpSign.css("display") === "none") {
-          tmpSign.fadeIn(500)
-        }
-      })
-    })
-    })
+    console.log("reset");
+   sign.css("display", "block")
   }
 
   function hideSigns(id) {
@@ -254,8 +280,10 @@ function signListener() {
     })
   }
 
-  resetSigns();
   let sign = $(".sign");
+  resetSigns();
+  console.log("sign listener");
+  sign.off("click");
   sign.on("click", function (event) {
     let clicked = $(this);
     if (window.local.role === "player1") {
@@ -273,7 +301,7 @@ function signListener() {
       });
     }
     hideSigns(clicked.attr("id"));
-    sign.off("click")
+    // sign.off("click")
   })
 }
 
@@ -350,7 +378,7 @@ function checkSigns() {
     //evaluate player picks
 
     function nestEvaluate(sign, win, loose, eval) {
-      switch(eval) {
+      switch (eval) {
         case win:
           return "win";
         case loose:
@@ -360,7 +388,7 @@ function checkSigns() {
       }
     }
 
-    switch(one) {
+    switch (one) {
       case "rock":
         return nestEvaluate("rock", "paper", "scissors", two);
       case "paper":
@@ -377,26 +405,34 @@ function checkSigns() {
       ref.update({
         points: (local.points + 1)
       }).then(() => {
-        signListener()
-      })
+        dbRef.flags.round.update({
+          complete: true
+        });
+        // signListener()
+      });
     }
 
-    switch(results) {
+    switch (results) {
       case "win":
-
-
+        writeResult(local.players.one, dbRef.players.one);
+        break;
+      case "loose":
+        writeResult(local.players.two, dbRef.players.two);
+        break;
+      case "tie":
+        signListener();
+        break;
     }
-
   }
-
 
   if (typeof local.players.one.sign !== "undefined"
-    && typeof local.players.one.sign !== "undefined") {
-    console.log("message")
-    let results = evaluate(local.players.one.sign, local.players.two.sign);
-    determineWinner(results)
+  && typeof local.players.one.sign !== "undefined") {
+  console.log("message");
+  let results = evaluate(local.players.one.sign, local.players.two.sign);
+  console.log(results);
+  determineWinner(results)
 
-  }
+}
 }
 
 function checkLocal() {
